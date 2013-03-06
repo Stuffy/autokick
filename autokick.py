@@ -11,16 +11,16 @@ from thread import start_new_thread, allocate_lock
 
 # TODO: Maybe logfiles? Kick from teamspeak if not on arma server?
 
-ts_query_ip = 'stuffyserv.net'
+ts_query_ip = ''
 ts_query_port = 10011
-ts_query_user = 'serveradmin'
-ts_query_password = 'nikospezial'
+ts_query_user = ''
+ts_query_password = ''
 ts_query_vsid = '1'
 
 
-be_server_ip = 'stuffyserv.net'
+be_server_ip = ''
 be_server_port = 2305
-be_server_password = 'jarate'
+be_server_password = ''
 
 users = []
 
