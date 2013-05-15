@@ -13,13 +13,13 @@ from thread import start_new_thread, allocate_lock
 
 ts_query_ip = ''
 ts_query_port = 10011
-ts_query_user = ''
+ts_query_user = 'serveradmin'
 ts_query_password = ''
 ts_query_vsid = '1'
 
 
 be_server_ip = ''
-be_server_port = 2305
+be_server_port = 2402
 be_server_password = ''
 
 users = []
@@ -146,7 +146,7 @@ def check_teamspeak(ip):
 	rowcount = 0
 	# might be ineffective
 	# Select based on the ip
-	cursor.execute('SELECT * FROM clients WHERE client_lastip="' + ip + '"')
+	cursor.execute('SELECT * FROM clients WHERE client_lastip="' + ip + '" order by client_lastconnected desc')
 
 
 	for row in cursor:
@@ -196,7 +196,7 @@ def check_timed_ts():
 			for i in range(0, len(users)):
 				if (check_teamspeak(users[i][3]) == False):
 					if (users[i][5] % 3 == 0):
-						sendmessage(b, becon_cmdpacket(False, 'say ' + str(users[i][1]) + ' You are not logged into TeamSpeak! Warning ' + str(users[i][5] / 3) + '/4. Join it! (stuffyserv.net)'))
+						sendmessage(b, becon_cmdpacket(False, 'say ' + str(users[i][1]) + ' You are not logged into TeamSpeak! Warning ' + str(users[i][5] / 3) + '/4. Join it! (stuffyserv.net:9988)'))
 						users[i][5] += 1
 						print 'Warning given'
 					else:
@@ -204,10 +204,10 @@ def check_timed_ts():
 						users[i][5] += 1
 					if (users[i][5] % 12 == 0):
 						print 'User kicked off (Not it teamspeak)'
-						sendmessage(b, becon_cmdpacket(False, 'kick ' + str(users[i][1])) + ' Not in teamspeak')
+						sendmessage(b, becon_cmdpacket(False, 'kick ' + str(users[i][1])))
 						users.pop(i)
 				elif (check_teamspeak(users[i][3]) == True):
-					print 'Check. User is in teamspeak'
+					print 'User is in teamspeak.'
 		time.sleep(10)
 
 def becon_receivemessage(s):
@@ -243,19 +243,20 @@ def becon_cmdpacket(keepalive, cmd):
 	global sequence
 
 	if keepalive == False:
-		message = '\x01' + chr(sequence) + cmd
+		message = '\x01' + unichr(sequence) + cmd
+		sequence += 1
 	else:
-		message = '\x01' + chr(sequence)
-	message = '\xFF' + message
-	sequence += 1
+		message = '\x01' + unichr(sequence)
+		print "Keepalive send"
+	message = '\xFF' + bytearray(message, 'utf-8')
 	checksum = binascii.crc32(message) & 0xffffffff
 	checksum = struct.pack('l', checksum)
 	checksum = checksum[:4]
 	return 'BE' + checksum + message
 
 def becon_acknowledge(sequence):
-	message = '\x02' + chr(sequence)
-	message = '\xFF' + message
+	message = '\x02' + unichr(sequence)
+	message = '\xFF' + bytearray(message, 'utf-8')
 	checksum = binascii.crc32(message)
 	checksum = struct.pack('l', checksum)
 	checksum = checksum[:4]
@@ -292,8 +293,6 @@ sendmessage(b, becon_loginpacket(be_server_password))
 
 sendmessage(s, 'login client_login_name=' + ts_query_user + ' client_login_password=' + ts_query_password + '\n')
 sendmessage(s, 'use ' + ts_query_vsid + '\n')
-
-#handle_reply('Player #0 Hackerbie (127.0.0.1:2304) connected')
 
 while True:
 	c = raw_input()
