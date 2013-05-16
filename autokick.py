@@ -4,7 +4,7 @@ import sys, time, os
 import re
 import Queue
 import socket
-import datetime
+from datetime import datetime
 import binascii
 import struct
 from thread import start_new_thread, allocate_lock
@@ -46,7 +46,7 @@ def create_socket(protocol):
 			s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		return s
 	except socket.error, msg:
-		print 'Failed to create socket. Error code: ' + str(msg[0]) + ' , Error message : ' + msg[1]
+		print '[' + str(datetime.now()) + '] ' + 'Failed to create socket. Error code: ' + str(msg[0]) + ' , Error message : ' + msg[1]
 		sys.exit()
 
 # Method to connect a socket to a specific adress and port
@@ -54,12 +54,12 @@ def connect(host, port, s):
 	try:
 		remote_ip = socket.gethostbyname(host)
 	except socket.gaierror:
-		print 'Hostname could not be resolved. Exiting'
+		print '[' + str(datetime.now()) + '] ' + 'Hostname could not be resolved. Exiting'
 
 	try:
 		s.connect((remote_ip, port))
 	except socket.error:
-		print 'Connecting failed on ' + host
+		print '[' + str(datetime.now()) + '] ' + 'Connecting failed on ' + host
 		sys.exit()
 
 # Send a message to a port. This is used to send the packets structured with the becon-method below aswell as
@@ -68,7 +68,7 @@ def sendmessage(s, message):
 	try:
 		s.sendall(message)
 	except socket.error:
-		print 'Send failed'
+		print '[' + str(datetime.now()) + '] ' + 'Socket send failed (Ts3query)'
 		sys.exit()
 
 # Receive messages from a socket. This is used only for teamspeak since bercon messages need special handling
@@ -112,15 +112,15 @@ def handle_reply(reply):
 					# if false, start with already 1 warning given and set the its var to 0 (means not in teamspeak)
 					its = 0
 					warnings = 1
-					print 'Not in TeamSpeak'
+					print '[' + str(datetime.now()) + '] ' + 'User ' + reply_words[1] + ' is NOT connected to TS'
 				elif (check_teamspeak(ipstring) == True):
 					# if true, set its to 1 (means he is in teamspeak)
 					its = 1
 					warnings = 0
-					print 'In TeamSpeak'
+					print '[' + str(datetime.now()) + '] ' + 'User ' + reply_words[1] + ' is connected to TS'
 				elif (check_teamspeak(ipstring) == 'ERROR'):
 					# if the method returns ERROR, something went wrong while checking
-					print 'Error while checking ts'
+					print '[' + str(datetime.now()) + '] ' + 'Error while checking TS'
 
 				# Fill vars into array and append to the global user array
 				dtary = [-1, arma_id, time.time(), ipstring, its, warnings]
@@ -131,7 +131,7 @@ def handle_reply(reply):
 				for i in range(0, len(users)):
 					if users[i][1] == str(arma_id):
 						users.pop(i)
-						print 'User removed from array (Disconnect)'
+						print '[' + str(datetime.now()) + '] ' + 'User' + reply_words[1] + 'removed from array (Disconnect)'
 
 # Check if the user connected to teamspeak via the database and query
 def check_teamspeak(ip):
@@ -190,7 +190,7 @@ def check_teamspeak(ip):
 
 def check_timed_ts():
 	global users
-	print 'Thread started'
+	print '[' + str(datetime.now()) + '] ' + 'TeamSpeak check-thread started'
 	while True:
 		if (len(users) >= 0):
 			for i in range(0, len(users)):
@@ -198,16 +198,16 @@ def check_timed_ts():
 					if (users[i][5] % 3 == 0):
 						sendmessage(b, becon_cmdpacket(False, 'say ' + str(users[i][1]) + ' You are not logged into TeamSpeak! Warning ' + str(users[i][5] / 3) + '/4. Join it! (stuffyserv.net:9988)'))
 						users[i][5] += 1
-						print 'Warning given'
+						print '[' + str(datetime.now()) + '] ' + 'Warning given to user '
 					else:
-						print 'User not in teamspeak. Warnings: ' + str(users[i][5])
+						print '[' + str(datetime.now()) + '] ' + 'User not in teamspeak. Warnings: ' + str(users[i][5])
 						users[i][5] += 1
 					if (users[i][5] % 12 == 0):
-						print 'User kicked off (Not it teamspeak)'
+						print '[' + str(datetime.now()) + '] ' + 'User kicked off (Not it teamspeak)'
 						sendmessage(b, becon_cmdpacket(False, 'kick ' + str(users[i][1])))
 						users.pop(i)
 				elif (check_teamspeak(users[i][3]) == True):
-					print 'User is in teamspeak.'
+					print '[' + str(datetime.now()) + '] ' + 'User is in teamspeak.'
 		time.sleep(10)
 
 def becon_receivemessage(s):
@@ -226,7 +226,7 @@ def becon_receivemessage(s):
 				handle_reply(reply[9:])
 		elif ord(reply[7:8]) == 0:	
 			if ord(reply[8:9]) == 0:
-				print 'Login failed'
+				print '[' + str(datetime.now()) + '] ' + 'Login failed'
 			elif ord(reply[8:9]) > 0:
 				pass
 				# todo: multipacket handeling here
@@ -247,7 +247,7 @@ def becon_cmdpacket(keepalive, cmd):
 		sequence += 1
 	else:
 		message = '\x01' + unichr(sequence)
-		print "Keepalive send"
+		print '[' + str(datetime.now()) + '] ' + "Keepalive send"
 	message = '\xFF' + bytearray(message, 'utf-8')
 	checksum = binascii.crc32(message) & 0xffffffff
 	checksum = struct.pack('l', checksum)
