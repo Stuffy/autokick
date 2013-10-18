@@ -1,3 +1,4 @@
+# Importing sqlite libs to read the TeamSpeak database.
 from sqlite3 import dbapi2 as sqlite
 import string
 import sys, time, os
@@ -9,18 +10,27 @@ import binascii
 import struct
 from thread import start_new_thread, allocate_lock
 
-# TODO: Maybe logfiles? Kick from teamspeak if not on arma server?
+# ------------------- Settings ------------------- #
 
-ts_query_ip = ''
+# Ip of the TeamSpeak-server, should be 127.0.0.1 most of the time.
+ts_query_ip = '127.0.0.1'
+# TeamSpeak query port, should be 10011 most of the time
 ts_query_port = 10011
+# User to connect as
 ts_query_user = 'serveradmin'
+# Password of that user
 ts_query_password = ''
+# VServer-ID, if you have more than one server running, change this to the number you'd like the bot to check
 ts_query_vsid = '1'
 
-
+# Ip of the BattleEye server. It's the same one the arma2 server uses
 be_server_ip = ''
+# BE server port. Can vary. Check your server.cfg
 be_server_port = 2402
+# BE admin password. Needed for the bot to connect.
 be_server_password = ''
+
+# ----------------------------------------------- #
 
 users = []
 
@@ -188,6 +198,7 @@ def check_teamspeak(ip):
 	connection.close()
 	return 'ERROR'
 
+# Thread method to check the teamspeak
 def check_timed_ts():
 	global users
 	print '[' + str(datetime.now()) + '] ' + 'TeamSpeak check-thread started'
@@ -196,7 +207,7 @@ def check_timed_ts():
 			for i in range(0, len(users)):
 				if (check_teamspeak(users[i][3]) == False):
 					if (users[i][5] % 3 == 0):
-						sendmessage(b, becon_cmdpacket(False, 'say ' + str(users[i][1]) + ' You are not logged into TeamSpeak! Warning ' + str(users[i][5] / 3) + '/4. Join it! (stuffyserv.net:9988)'))
+						sendmessage(b, becon_cmdpacket(False, 'say ' + str(users[i][1]) + ' You are not logged into TeamSpeak! Warning ' + str(users[i][5] / 3) + '/4. Join it!'))
 						users[i][5] += 1
 						print '[' + str(datetime.now()) + '] ' + 'Warning given to user '
 					else:
@@ -210,50 +221,81 @@ def check_timed_ts():
 					print '[' + str(datetime.now()) + '] ' + 'User is in teamspeak.'
 		time.sleep(10)
 
+# Method to filter out the payload from the battle-eye return packets
 def becon_receivemessage(s):
 	start_new_thread(becon_keepalive,(s,))
 	while 1:
+		# Aquire lock so the other threads wait for us
 		lock.acquire()
 		reply = s.recv(4096)
 		lock.release()
+		# Checking the first byte to determine the kind of message
+		# 2 means its a server message ( no response to a command send from us ! ), so send back a acknowledge-packet so the server knows we've got the packet
 		if ord(reply[7:8]) == 2:
 			sendmessage(s, becon_acknowledge(ord(reply[8:9])))
 			print reply[9:]
+			# Pass it to the reply handeling function.
 			handle_reply(reply[9:])
+		# If its a 1, its means its a response from the server, so we do the same as above
 		elif ord(reply[7:8]) == 1:
 			if reply[9:] != '':
+				# NOTE: Need clearification if a response packet needs to be acknoledged
+				sendmessage(s, becon_acknowledge(ord(reply[8:9])))
 				print reply[9:]
 				handle_reply(reply[9:])
-		elif ord(reply[7:8]) == 0:	
+		# If its 0 ( not null ! ), its either a login response or a multi packet-packet ( eh.. )
+		elif ord(reply[7:8]) == 0:
+			# So we check the second byte to determine what it is
+			# If its 0, its a rejected login packet, so say that to the user...	
 			if ord(reply[8:9]) == 0:
-				print '[' + str(datetime.now()) + '] ' + 'Login failed'
+				print '[' + str(datetime.now()) + '] ' + 'Login packet rejected'
+			# If its bigger than 0, its a accepted login packet OR multiple packets.
+			# Since we didn't get a login reject, and multiple packets are rarly used, we just pass and continue
 			elif ord(reply[8:9]) > 0:
 				pass
 				# todo: multipacket handeling here
 
+# Packet send to the BE-server with the login informations
+# Since the beserver wants a crc32 checksum of the payload, we are going to do that for him
 def becon_loginpacket(password):
+	# Construct the message body
+	# Since its a login packet, put a 0-byte in front of the password
 	message = '\x00' + password
+	# After that, add the normal FF-byte in front of the message, like we do it with all packets
 	message = '\xFF' + message
+	# Create the checksum
 	checksum = binascii.crc32(message) & 0xffffffff
+	# Pack checksum as signed 4 byte int
 	checksum = struct.pack('l', checksum)
+	# Only use the first 4 byte of the checksum ( sometimes its longer )
 	checksum = checksum[:4]
 	return 'BE' + checksum + message
 
+# Method to send a command-packet OR a keepalive packet
 def becon_cmdpacket(keepalive, cmd):
+	# Define the global var sequence to keep track of the messages send
 	global sequence
 
+	# Check if its a keepalive packet
 	if keepalive == False:
+		# If its a normal command packet, send everything
 		message = '\x01' + unichr(sequence) + cmd
 		sequence += 1
 	else:
+		# If its a keepalive packet, we only need to send the sequence but not increase it
+		# NOTE: Not sure if this is the correct way, but it works
 		message = '\x01' + unichr(sequence)
-		print '[' + str(datetime.now()) + '] ' + "Keepalive send"
+		print '[' + str(datetime.now()) + '] ' + "Keepalive packet send"
+	# Convert the message to a bytearray for sending
 	message = '\xFF' + bytearray(message, 'utf-8')
+	# See becon_loginpacket
 	checksum = binascii.crc32(message) & 0xffffffff
 	checksum = struct.pack('l', checksum)
 	checksum = checksum[:4]
 	return 'BE' + checksum + message
 
+# Method to send a packet acknowledge to the server
+# Same as the above functions
 def becon_acknowledge(sequence):
 	message = '\x02' + unichr(sequence)
 	message = '\xFF' + bytearray(message, 'utf-8')
@@ -262,6 +304,7 @@ def becon_acknowledge(sequence):
 	checksum = checksum[:4]
 	return 'BE' + checksum + message
 
+# Thread function to send the keepalive packets at 30 second intervals
 def becon_keepalive(s):
 	timer = 0
 	while True:
