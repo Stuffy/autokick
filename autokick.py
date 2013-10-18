@@ -239,7 +239,7 @@ def becon_receivemessage(s):
 		if ord(reply[7:8]) == 2:
 			sendmessage(s, becon_acknowledge(ord(reply[8:9])))
 			print reply[9:]
-			# Pass it to the reply handeling function.
+			# Pass it to the reply handeling function
 			handle_reply(reply[9:])
 		# If its a 1, its means its a response from the server, so we do the same as above
 		elif ord(reply[7:8]) == 1:
