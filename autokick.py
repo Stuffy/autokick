@@ -221,6 +221,11 @@ def check_timed_ts():
 					print '[' + str(datetime.now()) + '] ' + 'User is in teamspeak.'
 		time.sleep(10)
 
+# 
+# NOTE: This is only a rough explanation of what I did, for more infos please refer to
+# http://www.battleye.com/downloads/BERConProtocol.txt
+#
+
 # Method to filter out the payload from the battle-eye return packets
 def becon_receivemessage(s):
 	start_new_thread(becon_keepalive,(s,))
